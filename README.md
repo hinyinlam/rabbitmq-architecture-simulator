@@ -1,6 +1,8 @@
 # RabbitMQ Architecture simulator
 This project helps RabbitMQ architects to design both RabbitMQ server and AMQP related architecture design.
 
+![whatitdoes](doc/whatitdoes.png)
+
 ## Objective:
 This project aim to provide a dockerized environment to simulate different topology of RabbitMQ server deployment.
 For example: Multi-Site RabbitMQ deployment with latency across 2 sites.
