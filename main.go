@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"os"
@@ -31,7 +32,6 @@ func createSite(siteName string, rabbitmqConfigFilename string, timeoutSecond in
 		go func(nodeName string) {
 			container := createRabbitMQNode(nodeName, siteNetworkName, rabbitmqConfigFilename, timeoutSecond)
 			printRabbitMQMappedPorts(container)
-			printContainerNetwork(container)
 		}(nodeName)
 		//defer container.Terminate(ctx)
 
@@ -57,7 +57,6 @@ func createNetwork(networkName string) func() {
 	})
 	if err == nil {
 		//New network
-		//time.Sleep(time.Second * 2) //very bad way to fix the "network yet create but container still able to start issue
 		for try := 0; ; try++ {
 			cmd := exec.Command("docker", "network", "inspect", networkName)
 			cmd.Stdout = os.Stdout
@@ -86,11 +85,6 @@ func createNetwork(networkName string) func() {
 	}
 }
 
-func printContainerNetwork(container testcontainers.Container) {
-	fmt.Println(container.Host(ctx))
-	fmt.Println(container.Name(ctx))
-}
-
 func createRabbitMQNode(nodeName string, networkName string, rabbitmqConfigFilename string, timeoutSecond int) testcontainers.Container {
 	exposedPorts := GetRabbitMQExposedPorts()
 	rabbitmqConfigHostFilePath, err := filepath.Abs(rabbitmqConfigFilename)
@@ -103,17 +97,18 @@ func createRabbitMQNode(nodeName string, networkName string, rabbitmqConfigFilen
 		testcontainers.GenericContainerRequest{
 			Started: true,
 			ContainerRequest: testcontainers.ContainerRequest{
+				Name:         nodeName,
 				Image:        "rabbitmq:3.10.0-management",
 				ExposedPorts: exposedPorts, //[]string{"5671", "15692", "4369", "5672", "15691", "25672", "15671-15672", "8080"},
 				Resources: container.Resources{
-					Memory: 100 * 1024 * 1024, //100MB
+					Memory: 256 * 1024 * 1024, //100MB
 				},
 				Hostname: nodeName,
 				Networks: []string{networkName},
 				NetworkAliases: map[string][]string{
 					networkName: {nodeName},
 				},
-				WaitingFor: wait.ForListeningPort("15672"), //.WithStartupTimeout(time.Second * time.Duration(timeoutSecond)),
+				WaitingFor: wait.ForListeningPort("15672"), //.WithStartupTimeout(time.Second # time.Duration(timeoutSecond)),
 				Env: map[string]string{ // https://www.rabbitmq.com/configure.html#supported-environment-variables
 					"RABBITMQ_ERLANG_COOKIE": RABBITMQ_ERLANG_COOKIE,
 					"RABBITMQ_CONFIG_FILE":   rabbitmqConfigInsidePath,
@@ -137,13 +132,31 @@ func createRabbitMQNode(nodeName string, networkName string, rabbitmqConfigFilen
 }
 
 func printRabbitMQMappedPorts(container testcontainers.Container) {
+	hostname, err := container.Host(ctx)
+	if err != nil {
+		panic(err)
+	}
+	containerName, err := container.Name(ctx)
+	if err != nil {
+		panic(err)
+	}
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{"Port Purpose", "Default Port", "Mapped Port"})
 	for portName, portRange := range rabbitmqPorts {
 		port, err := container.MappedPort(ctx, nat.Port(portRange))
 		if err != nil {
 			continue
 		}
-		fmt.Printf("%s : %s\n", portName, port)
+		t.AppendRows([]table.Row{
+			{portName, portRange, hostname + ":" + string(port)},
+		})
 	}
+	t.SortBy([]table.SortBy{
+		{Name: "Port Purpose", Mode: table.Asc},
+	})
+
+	renderedTable := t.Render()
+	fmt.Printf("===%s===\n%s\n", containerName, renderedTable)
 }
 
 func GetRabbitMQExposedPorts() []string {
@@ -177,10 +190,10 @@ var rabbitmqPorts = map[string]string{
 	"RabbitMQ Stream protocol - Plain ": "5552",
 	"RabbitMQ Stream protocol - TLS":    "5551",
 	//"RabbitMQ Stream replication":       "6000-6500",
-	"Erlang distribution server port - inter-node and CLI tools communication (AMQP port + 20000)": "25672",
-	"Erlang distribution client port - CLI tools":                                                  "35672-35682",
-	"Management UI + HTTP API - Plain":                                                             "15672",
-	"Management UI + HTTP API - TLS":                                                               "15671",
+	"Erlang distribution server port - (AMQP port + 20000)": "25672",
+	"Erlang distribution client port - CLI tools":           "35672-35682",
+	"Management UI + HTTP API - Plain":                      "15672",
+	"Management UI + HTTP API - TLS":                        "15671",
 	//"STOMP clients - Plain":                                                                        "61613",
 	//"STOMP clients - TLS":                                                                          "61614",
 	//"MQTT clients - TLS":                                                                           "8883",

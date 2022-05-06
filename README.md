@@ -26,4 +26,7 @@ cases such as:
 3. Replacing [RabbitMQ Simulator](https://github.com/RabbitMQSimulator/RabbitMQSimulator) 
 
 ## What is the difference of Architecture Simulator vs RabbitMQ Simulator?
-[TBD]
+[RabbitMQ Simulator](https://github.com/RabbitMQSimulator/RabbitMQSimulator) Simulate the Exchanges + Queue + Binding interaction with consumer and producer.
+
+This repo [RabbitMQ Architecture Simulator](https://github.com/hinyinlam/rabbitmq-architecture-simulator) simulate the RabbitMQ server itself, such as forming Cluster in a multi-site deployment.
+
